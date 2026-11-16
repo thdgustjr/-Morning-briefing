@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>아침 경제·코인 브리핑</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+    body { background-color: #0f172a; color: #f8fafc; padding: 20px 16px 40px; max-width: 600px; margin: 0 auto; }
+    header { margin-bottom: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 12px; }
+    h1 { font-size: 22px; font-weight: 700; color: #38bdf8; }
+    .date { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+    .section-title { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 20px 0 10px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .card { background: #1e293b; border-radius: 12px; padding: 14px; border: 1px solid #334155; }
+    .card-name { font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+    .card-price { font-size: 18px; font-weight: 700; }
+    .up { color: #f87171; }
+    .down { color: #60a5fa; }
+    .news-box { background: #1e293b; border-radius: 12px; padding: 16px; border: 1px solid #334155; line-height: 1.65; font-size: 15px; white-space: pre-line; }
+    .news-item { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #334155; }
+    .news-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+    .loading { text-align: center; color: #94a3b8; padding: 40px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>☀️ 모닝 마켓 브리핑</h1>
+    <div class="date" id="updated-at">데이터 불러오는 중...</div>
+  </header>
+
+  <div class="section-title">📊 주요 시장 및 코인 시세</div>
+  <div class="grid" id="market-grid">
+    <div class="card"><div class="card-name">로딩 중</div><div class="card-price">-</div></div>
+  </div>
+
+  <div class="section-title">🤖 간밤의 핵심 뉴스 AI 요약</div>
+  <div class="news-box" id="news-content">
+    <div class="loading">브리핑 데이터를 준비하고 있습니다...</div>
+  </div>
+
+  <script>
+    async function loadBriefing() {
+      try {
+        const res = await fetch('./data.json?t=' + new Date().getTime());
+        if (!res.ok) throw new Error('데이터 없음');
+        const data = await res.json();
+
+        document.getElementById('updated-at').innerText = '업데이트: ' + data.updated_at;
+
+        const grid = document.getElementById('market-grid');
+        grid.innerHTML = '';
+        data.markets.forEach(item => {
+          const isUp = item.change.includes('+');
+          const colorClass = isUp ? 'up' : (item.change.includes('-') ? 'down' : '');
+          grid.innerHTML += `
+            <div class="card">
+              <div class="card-name">${item.name}</div>
+              <div class="card-price">${item.price}</div>
+              <div class="date ${colorClass}">${item.change}</div>
+            </div>
+          `;
+        });
+
+        document.getElementById('news-content').innerText = data.summary;
+      } catch (e) {
+        document.getElementById('updated-at').innerText = '아직 첫 데이터가 생성되지 않았습니다.';
+        document.getElementById('news-content').innerText = 'GitHub Actions에서 첫 실행을 완료하면 이곳에 시세와 뉴스 요약이 표시됩니다.';
+      }
+    }
+    loadBriefing();
+  </script>
+</body>
+</html>
