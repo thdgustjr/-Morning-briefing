@@ -1,7 +1,9 @@
 import os
 import json
+import time
 import urllib.request
 import urllib.parse
+import urllib.error
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
@@ -76,51 +78,69 @@ api_key = os.environ.get("GEMINI_API_KEY", "").strip()
 quote = "오늘도 냉철한 판단과 흔들림 없는 원칙으로 시장을 이기는 하루를 시작하세요!"
 summary = ""
 
+def call_gemini_with_retry(prompt, key):
+    # 주력 모델이 바쁠(503) 경우 자동 재시도 후 예비 모델로 자동 전환
+    models = ["gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-3.8-pro"]
+    last_error = ""
+    for model in models:
+        for attempt in range(3):
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+                payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode("utf-8")
+                req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=40) as res:
+                    result = json.loads(res.read().decode())
+                    return result["candidates"][0]["content"]["parts"][0]["text"], None
+            except urllib.error.HTTPError as e:
+                err_body = e.read().decode("utf-8", errors="ignore")
+                last_error = f"AI API 호출 오류 ({model} / {e.code}): {err_body}"
+                if e.code in (429, 500, 502, 503, 504):
+                    time.sleep(5)
+                    continue
+                else:
+                    break
+            except Exception as e:
+                last_error = f"AI 요약 오류 ({model}): {str(e)}"
+                time.sleep(3)
+    return None, last_error
+
 if not api_key:
     summary = "오류: GitHub Secrets에 GEMINI_API_KEY가 등록되지 않았거나 비어 있습니다."
 elif not us_market_news and not crypto_news:
     summary = "오류: 구글 뉴스 헤드라인을 수집하지 못했습니다."
 else:
-    try:
-        us_text = "\n".join(f"- {t}" for t in us_market_news)
-        crypto_text = "\n".join(f"- {t}" for t in crypto_news)
+    us_text = "\n".join(f"- {t}" for t in us_market_news)
+    crypto_text = "\n".join(f"- {t}" for t in crypto_news)
 
-        prompt = (
-            f"오늘은 {today_date}입니다. 당신은 월스트리트 매크로 전략가 겸 암호화폐 수석 애널리스트입니다. "
-            "아래 수집된 간밤의 미국 증시 뉴스와 비트코인/코인 시장 뉴스를 바탕으로 두 가지를 작성해 주세요.\n\n"
-            "[출력 형식 - 반드시 아래 구분선 '===SPLIT==='을 기준으로 두 부분을 나누어 출력하세요]\n"
-            "첫 번째 부분: 아침에 앱을 켠 투자자의 정신이 번쩍 들고, 하루를 시작할 힘이 나게 만드는 강렬하고 묵직한 모닝 마인드셋/동기부여 문구 (오늘 시장 분위기를 살짝 반영하되, 1~2문장으로 짧고 굵게 작성. 따옴표나 부가 설명 없이 문장만 출력)\n"
-            "===SPLIT===\n"
-            "두 번째 부분: 아침 9시 30분에 투자자가 시장을 깊이 있게 이해할 수 있는 상세 모닝 리포트\n"
-            "- 각 섹션마다 구체적인 원인·배경·시장 반응을 포함해 5~7문장 이상으로 자세하게 서술하세요.\n"
-            "- 아래 3가지 소제목을 반드시 사용하세요.\n\n"
-            "🇺🇸 1. 미국 증시 및 거시경제 심층 분석\n"
-            "(간밤 뉴욕 증시의 주요 지수 흐름, 연준 인사 발언이나 금리·물가 지표 영향, 엔비디아·빅테크 등 주도 섹터의 움직임과 그 배경을 상세히 설명)\n\n"
-            "₿ 2. 비트코인 및 암호화폐 시장 동향\n"
-            "(비트코인 및 주요 알트코인의 가격 흐름, 현물 ETF 자금 유입·유출, 기관 동향, 규제 및 거시경제와의 커플링/디커플링 요인을 깊이 있게 분석)\n\n"
-            "📌 3. 오늘의 핵심 관전 포인트 및 전략\n"
-            "(미국 시장과 코인 흐름이 오늘 국내 증시(코스피/코스닥)와 환율에 미칠 영향, 오늘 밤 예정된 주요 일정이나 투자자가 주의해야 할 리스크 요인 정리)\n\n"
-            f"[수집된 미국 증시 헤드라인]\n{us_text}\n\n"
-            f"[수집된 암호화폐 헤드라인]\n{crypto_text}"
-        )
+    prompt = (
+        f"오늘은 {today_date}입니다. 당신은 월스트리트 매크로 전략가 겸 암호화폐 수석 애널리스트입니다. "
+        "아래 수집된 간밤의 미국 증시 뉴스와 비트코인/코인 시장 뉴스를 바탕으로 두 가지를 작성해 주세요.\n\n"
+        "[출력 형식 - 반드시 아래 구분선 '===SPLIT==='을 기준으로 두 부분을 나누어 출력하세요]\n"
+        "첫 번째 부분: 아침에 앱을 켠 투자자의 정신이 번쩍 들고, 하루를 시작할 힘이 나게 만드는 강렬하고 묵직한 모닝 마인드셋/동기부여 문구 (오늘 시장 분위기를 살짝 반영하되, 1~2문장으로 짧고 굵게 작성. 따옴표나 부가 설명 없이 문장만 출력)\n"
+        "===SPLIT===\n"
+        "두 번째 부분: 아침 9시 30분에 투자자가 시장을 깊이 있게 이해할 수 있는 상세 모닝 리포트\n"
+        "- 각 섹션마다 구체적인 원인·배경·시장 반응을 포함해 5~7문장 이상으로 자세하게 서술하세요.\n"
+        "- 아래 3가지 소제목을 반드시 사용하세요.\n\n"
+        "🇺🇸 1. 미국 증시 및 거시경제 심층 분석\n"
+        "(간밤 뉴욕 증시의 주요 지수 흐름, 연준 인사 발언이나 금리·물가 지표 영향, 엔비디아·빅테크 등 주도 섹터의 움직임과 그 배경을 상세히 설명)\n\n"
+        "₿ 2. 비트코인 및 암호화폐 시장 동향\n"
+        "(비트코인 및 주요 알트코인의 가격 흐름, 현물 ETF 자금 유입·유출, 기관 동향, 규제 및 거시경제와의 커플링/디커플링 요인을 깊이 있게 분석)\n\n"
+        "📌 3. 오늘의 핵심 관전 포인트 및 전략\n"
+        "(미국 시장과 코인 흐름이 오늘 국내 증시(코스피/코스닥)와 환율에 미칠 영향, 오늘 밤 예정된 주요 일정이나 투자자가 주의해야 할 리스크 요인 정리)\n\n"
+        f"[수집된 미국 증시 헤드라인]\n{us_text}\n\n"
+        f"[수집된 암호화폐 헤드라인]\n{crypto_text}"
+    )
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={api_key}"
-        payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode("utf-8")
-        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=30) as res:
-            result = json.loads(res.read().decode())
-            full_text = result["candidates"][0]["content"]["parts"][0]["text"]
-            if "===SPLIT===" in full_text:
-                parts = full_text.split("===SPLIT===", 1)
-                quote = parts[0].strip()
-                summary = parts[1].strip()
-            else:
-                summary = full_text.strip()
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode("utf-8", errors="ignore")
-        summary = f"AI API 호출 오류 ({e.code}): {err_body}"
-    except Exception as e:
-        summary = f"AI 요약 오류: {str(e)}"
+    full_text, err = call_gemini_with_retry(prompt, api_key)
+    if full_text:
+        if "===SPLIT===" in full_text:
+            parts = full_text.split("===SPLIT===", 1)
+            quote = parts[0].strip()
+            summary = parts[1].strip()
+        else:
+            summary = full_text.strip()
+    else:
+        summary = err
 
 output = {
     "updated_at": now_str,
