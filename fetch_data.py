@@ -1,0 +1,120 @@
+import os
+import json
+import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone, timedelta
+
+KST = timezone(timedelta(hours=9))
+now_str = datetime.now(KST).strftime("%Y년 %m월 %d일 %H:%M 기준")
+
+def get_yahoo_price(symbol, name, is_krw=False):
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=2d"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as res:
+            data = json.loads(res.read().decode())
+            meta = data['chart']['result'][0]['meta']
+            price = meta['regularMarketPrice']
+            prev = meta['chartPreviousClose']
+            diff_pct = ((price - prev) / prev) * 100
+            sign = "+" if diff_pct >= 0 else ""
+            price_fmt = f"{price:,.0f}원" if is_krw else f"{price:,.2f}"
+            return {"name": name, "price": price_fmt, "change": f"{sign}{diff_pct:.2f}%"}
+    except Exception:
+        return {"name": name, "price": "조회 실패", "change": "0.00%"}
+
+markets = [
+    # 주요 지수 및 코인/환율/원자재
+    get_yahoo_price("^GSPC", "미국 S&P 500"),
+    get_yahoo_price("^IXIC", "미국 나스닥"),
+    get_yahoo_price("BTC-USD", "비트코인 (USD)"),
+    get_yahoo_price("ETH-USD", "이더리움 (USD)"),
+    get_yahoo_price("KRW=X", "원/달러 환율", is_krw=True),
+    get_yahoo_price("^KS11", "코스피 (KOSPI)"),
+    get_yahoo_price("GC=F", "국제 금 시세"),
+
+    # 국내 주요 종목
+    get_yahoo_price("005930.KS", "삼성전자", is_krw=True),
+    get_yahoo_price("000660.KS", "SK하이닉스", is_krw=True),
+
+    # 미국 주요 종목
+    get_yahoo_price("NVDA", "엔비디아"),
+    get_yahoo_price("MSFT", "마이크로소프트"),
+    get_yahoo_price("GOOGL", "구글 (알파벳)"),
+    get_yahoo_price("AMZN", "아마존"),
+    get_yahoo_price("META", "메타"),
+    get_yahoo_price("TSLA", "테슬라"),
+    get_yahoo_price("V", "비자 (Visa)"),
+    get_yahoo_price("ZTS", "조에티스 (ZTS)"),
+    get_yahoo_price("DIS", "디즈니 (DIS)"),
+    get_yahoo_price("FERG", "퍼거슨 (FERG)"),
+    get_yahoo_price("RIG", "트랜스오션 (RIG)")
+]
+
+def fetch_rss_titles(url, limit=10):
+    titles = []
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as res:
+            root = ET.fromstring(res.read())
+            for item in root.findall('.//item')[:limit]:
+                titles.append(item.find('title').text)
+    except Exception:
+        pass
+    return list(dict.fromkeys(titles))
+
+# 미국 증시 및 거시경제 전용 뉴스 수집
+us_market_news = fetch_rss_titles(
+    "https://news.google.com/rss/search?q=미국증시+OR+나스닥+OR+연준+OR+FOMC+OR+엔비디아&hl=ko&gl=KR&ceid=KR:ko",
+    limit=10
+)
+
+# 비트코인 및 암호화폐 전용 뉴스 수집
+crypto_news = fetch_rss_titles(
+    "https://news.google.com/rss/search?q=비트코인+OR+이더리움+OR+암호화폐+OR+가상자산+ETF&hl=ko&gl=KR&ceid=KR:ko",
+    limit=10
+)
+
+api_key = os.environ.get("GEMINI_API_KEY", "")
+
+summary = "뉴스 요약 생성에 실패했습니다."
+if api_key and (us_market_news or crypto_news):
+    try:
+        us_text = "\n".join(f"- {t}" for t in us_market_news)
+        crypto_text = "\n".join(f"- {t}" for t in crypto_news)
+
+        prompt = (
+            "당신은 월스트리트 매크로 전략가 겸 암호화폐 수석 애널리스트입니다. "
+            "아래 수집된 간밤의 미국 증시 뉴스와 비트코인/코인 시장 뉴스를 바탕으로, "
+            "아침 9시 30분에 투자자가 시장을 깊이 있게 이해할 수 있도록 상세하고 풍부한 모닝 리포트를 작성해 주세요.\n\n"
+            "[작성 규칙]\n"
+            "1. 단답형 줄글을 피하고, 각 섹션마다 구체적인 원인·배경·시장 반응을 포함해 5~7문장 이상으로 자세하게 서술하세요.\n"
+            "2. 가독성을 위해 아래 3가지 소제목을 반드시 사용하고, 핵심 키워드나 수치를 명확히 짚어주세요.\n"
+            "3. 불필요한 인사말 없이 바로 리포트 본문만 출력하세요.\n\n"
+            "🇺🇸 1. 미국 증시 및 거시경제 심층 분석\n"
+            "(간밤 뉴욕 증시의 주요 지수 흐름, 연준 인사 발언이나 금리·물가 지표 영향, 엔비디아·빅테크 등 주도 섹터의 움직임과 그 배경을 상세히 설명)\n\n"
+            "₿ 2. 비트코인 및 암호화폐 시장 동향\n"
+            "(비트코인 및 주요 알트코인의 가격 흐름, 현물 ETF 자금 유입·유출, 기관 동향, 규제 및 거시경제와의 커플링/디커플링 요인을 깊이 있게 분석)\n\n"
+            "📌 3. 오늘의 핵심 관전 포인트 및 전략\n"
+            "(미국 시장과 코인 흐름이 오늘 국내 증시(코스피/코스닥)와 환율에 미칠 영향, 오늘 밤 예정된 주요 일정이나 투자자가 주의해야 할 리스크 요인 정리)\n\n"
+            f"[수집된 미국 증시 헤드라인]\n{us_text}\n\n"
+            f"[수집된 암호화폐 헤드라인]\n{crypto_text}"
+        )
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode("utf-8")
+        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as res:
+            result = json.loads(res.read().decode())
+            summary = result["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        summary = f"AI 요약 오류: {str(e)}"
+
+output = {
+    "updated_at": now_str,
+    "markets": markets,
+    "summary": summary
+}
+
+with open("data.json", "w", encoding="utf-8") as f:
+    json.dump(output, f, ensure_ascii=False, indent=2)
