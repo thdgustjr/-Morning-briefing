@@ -5,7 +5,9 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
 KST = timezone(timedelta(hours=9))
-now_str = datetime.now(KST).strftime("%Y년 %m월 %d일 %H:%M 기준")
+now_dt = datetime.now(KST)
+now_str = now_dt.strftime("%Y년 %m월 %d일 %H:%M 기준")
+today_date = now_dt.strftime("%Y년 %m월 %d일")
 
 def get_yahoo_price(symbol, name, is_krw=False):
     try:
@@ -63,13 +65,11 @@ def fetch_rss_titles(url, limit=10):
         pass
     return list(dict.fromkeys(titles))
 
-# 미국 증시 및 거시경제 전용 뉴스 수집
 us_market_news = fetch_rss_titles(
     "https://news.google.com/rss/search?q=미국증시+OR+나스닥+OR+연준+OR+FOMC+OR+엔비디아&hl=ko&gl=KR&ceid=KR:ko",
     limit=10
 )
 
-# 비트코인 및 암호화폐 전용 뉴스 수집
 crypto_news = fetch_rss_titles(
     "https://news.google.com/rss/search?q=비트코인+OR+이더리움+OR+암호화폐+OR+가상자산+ETF&hl=ko&gl=KR&ceid=KR:ko",
     limit=10
@@ -77,20 +77,23 @@ crypto_news = fetch_rss_titles(
 
 api_key = os.environ.get("GEMINI_API_KEY", "")
 
+quote = "오늘도 냉철한 판단과 흔들림 없는 원칙으로 시장을 이기는 하루를 시작하세요!"
 summary = "뉴스 요약 생성에 실패했습니다."
+
 if api_key and (us_market_news or crypto_news):
     try:
         us_text = "\n".join(f"- {t}" for t in us_market_news)
         crypto_text = "\n".join(f"- {t}" for t in crypto_news)
 
         prompt = (
-            "당신은 월스트리트 매크로 전략가 겸 암호화폐 수석 애널리스트입니다. "
-            "아래 수집된 간밤의 미국 증시 뉴스와 비트코인/코인 시장 뉴스를 바탕으로, "
-            "아침 9시 30분에 투자자가 시장을 깊이 있게 이해할 수 있도록 상세하고 풍부한 모닝 리포트를 작성해 주세요.\n\n"
-            "[작성 규칙]\n"
-            "1. 단답형 줄글을 피하고, 각 섹션마다 구체적인 원인·배경·시장 반응을 포함해 5~7문장 이상으로 자세하게 서술하세요.\n"
-            "2. 가독성을 위해 아래 3가지 소제목을 반드시 사용하고, 핵심 키워드나 수치를 명확히 짚어주세요.\n"
-            "3. 불필요한 인사말 없이 바로 리포트 본문만 출력하세요.\n\n"
+            f"오늘은 {today_date}입니다. 당신은 월스트리트 매크로 전략가 겸 암호화폐 수석 애널리스트입니다. "
+            "아래 수집된 간밤의 미국 증시 뉴스와 비트코인/코인 시장 뉴스를 바탕으로 두 가지를 작성해 주세요.\n\n"
+            "[출력 형식 - 반드시 아래 구분선 '===SPLIT==='을 기준으로 두 부분을 나누어 출력하세요]\n"
+            "첫 번째 부분: 아침에 앱을 켠 투자자의 정신이 번쩍 들고, 하루를 시작할 힘이 나게 만드는 강렬하고 묵직한 모닝 마인드셋/동기부여 문구 (오늘 시장 분위기를 살짝 반영하되, 1~2문장으로 짧고 굵게 작성. 따옴표나 부가 설명 없이 문장만 출력)\n"
+            "===SPLIT===\n"
+            "두 번째 부분: 아침 9시 30분에 투자자가 시장을 깊이 있게 이해할 수 있는 상세 모닝 리포트\n"
+            "- 각 섹션마다 구체적인 원인·배경·시장 반응을 포함해 5~7문장 이상으로 자세하게 서술하세요.\n"
+            "- 아래 3가지 소제목을 반드시 사용하세요.\n\n"
             "🇺🇸 1. 미국 증시 및 거시경제 심층 분석\n"
             "(간밤 뉴욕 증시의 주요 지수 흐름, 연준 인사 발언이나 금리·물가 지표 영향, 엔비디아·빅테크 등 주도 섹터의 움직임과 그 배경을 상세히 설명)\n\n"
             "₿ 2. 비트코인 및 암호화폐 시장 동향\n"
@@ -106,12 +109,19 @@ if api_key and (us_market_news or crypto_news):
         req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=30) as res:
             result = json.loads(res.read().decode())
-            summary = result["candidates"][0]["content"]["parts"][0]["text"]
+            full_text = result["candidates"][0]["content"]["parts"][0]["text"]
+            if "===SPLIT===" in full_text:
+                parts = full_text.split("===SPLIT===", 1)
+                quote = parts[0].strip()
+                summary = parts[1].strip()
+            else:
+                summary = full_text.strip()
     except Exception as e:
         summary = f"AI 요약 오류: {str(e)}"
 
 output = {
     "updated_at": now_str,
+    "quote": quote,
     "markets": markets,
     "summary": summary
 }
