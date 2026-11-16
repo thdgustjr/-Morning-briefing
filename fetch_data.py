@@ -1,6 +1,7 @@
 import os
 import json
 import urllib.request
+import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
@@ -53,9 +54,11 @@ markets = [
     get_yahoo_price("RIG", "트랜스오션 (RIG)")
 ]
 
-def fetch_rss_titles(url, limit=10):
+def fetch_rss_titles(query, limit=10):
     titles = []
     try:
+        encoded_query = urllib.parse.quote(query)
+        url = f"https://news.google.com/rss/search?q={encoded_query}&hl=ko&gl=KR&ceid=KR:ko"
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=10) as res:
             root = ET.fromstring(res.read())
@@ -65,22 +68,19 @@ def fetch_rss_titles(url, limit=10):
         pass
     return list(dict.fromkeys(titles))
 
-us_market_news = fetch_rss_titles(
-    "https://news.google.com/rss/search?q=미국증시+OR+나스닥+OR+연준+OR+FOMC+OR+엔비디아&hl=ko&gl=KR&ceid=KR:ko",
-    limit=10
-)
+us_market_news = fetch_rss_titles("미국증시 OR 나스닥 OR 연준 OR FOMC OR 엔비디아", limit=10)
+crypto_news = fetch_rss_titles("비트코인 OR 이더리움 OR 암호화폐 OR 가상자산 ETF", limit=10)
 
-crypto_news = fetch_rss_titles(
-    "https://news.google.com/rss/search?q=비트코인+OR+이더리움+OR+암호화폐+OR+가상자산+ETF&hl=ko&gl=KR&ceid=KR:ko",
-    limit=10
-)
-
-api_key = os.environ.get("GEMINI_API_KEY", "")
+api_key = os.environ.get("GEMINI_API_KEY", "").strip()
 
 quote = "오늘도 냉철한 판단과 흔들림 없는 원칙으로 시장을 이기는 하루를 시작하세요!"
-summary = "뉴스 요약 생성에 실패했습니다."
+summary = ""
 
-if api_key and (us_market_news or crypto_news):
+if not api_key:
+    summary = "오류: GitHub Secrets에 GEMINI_API_KEY가 등록되지 않았거나 비어 있습니다."
+elif not us_market_news and not crypto_news:
+    summary = "오류: 구글 뉴스 헤드라인을 수집하지 못했습니다."
+else:
     try:
         us_text = "\n".join(f"- {t}" for t in us_market_news)
         crypto_text = "\n".join(f"- {t}" for t in crypto_news)
@@ -116,6 +116,9 @@ if api_key and (us_market_news or crypto_news):
                 summary = parts[1].strip()
             else:
                 summary = full_text.strip()
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="ignore")
+        summary = f"AI API 호출 오류 ({e.code}): {err_body}"
     except Exception as e:
         summary = f"AI 요약 오류: {str(e)}"
 
