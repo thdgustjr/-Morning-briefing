@@ -9,9 +9,22 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
     body { background-color: #0f172a; color: #f8fafc; padding: 20px 16px 40px; max-width: 600px; margin: 0 auto; }
-    header { margin-bottom: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 12px; }
+    header { margin-bottom: 16px; border-bottom: 1px solid #1e293b; padding-bottom: 12px; }
     h1 { font-size: 22px; font-weight: 700; color: #38bdf8; }
     .date { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+    
+    /* 오늘의 모닝 멘탈/동기부여 카드 스타일 */
+    .quote-card {
+      background: linear-gradient(135deg, #1e293b 0%, #0f2942 100%);
+      border-left: 4px solid #38bdf8;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+    .quote-label { font-size: 11px; font-weight: 700; color: #38bdf8; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .quote-text { font-size: 15px; font-weight: 600; color: #f1f5f9; line-height: 1.55; word-break: keep-all; }
+
     .section-title { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 20px 0 10px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .card { background: #1e293b; border-radius: 12px; padding: 14px; border: 1px solid #334155; }
@@ -20,8 +33,6 @@
     .up { color: #f87171; }
     .down { color: #60a5fa; }
     .news-box { background: #1e293b; border-radius: 12px; padding: 16px; border: 1px solid #334155; line-height: 1.65; font-size: 15px; white-space: pre-line; }
-    .news-item { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #334155; }
-    .news-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
     .loading { text-align: center; color: #94a3b8; padding: 40px 0; }
   </style>
 </head>
@@ -30,6 +41,12 @@
     <h1>☀️ 모닝 마켓 브리핑</h1>
     <div class="date" id="updated-at">데이터 불러오는 중...</div>
   </header>
+
+  <!-- 매일 아침 정신 번쩍 들게 해주는 한 마디 구역 -->
+  <div class="quote-card">
+    <div class="quote-label">🔥 TODAY'S MINDSET</div>
+    <div class="quote-text" id="daily-quote">오늘의 마인드셋 문구를 불러오는 중...</div>
+  </div>
 
   <div class="section-title">📊 주요 시장 및 코인 시세</div>
   <div class="grid" id="market-grid">
@@ -49,6 +66,7 @@
         const data = await res.json();
 
         document.getElementById('updated-at').innerText = '업데이트: ' + data.updated_at;
+        document.getElementById('daily-quote').innerText = data.quote || '오늘도 흔들림 없는 원칙으로 시장을 이기는 하루 되세요!';
 
         const grid = document.getElementById('market-grid');
         grid.innerHTML = '';
@@ -67,6 +85,7 @@
         document.getElementById('news-content').innerText = data.summary;
       } catch (e) {
         document.getElementById('updated-at').innerText = '아직 첫 데이터가 생성되지 않았습니다.';
+        document.getElementById('daily-quote').innerText = '시장은 인내심 없는 자의 돈을 인내심 있는 자에게 옮기는 도구다.';
         document.getElementById('news-content').innerText = 'GitHub Actions에서 첫 실행을 완료하면 이곳에 시세와 뉴스 요약이 표시됩니다.';
       }
     }
