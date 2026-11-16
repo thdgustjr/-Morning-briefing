@@ -1,31 +1,31 @@
 {
-  "updated_at": "2026년 11월 16일 23:56 기준",
+  "updated_at": "2026년 11월 17일 00:17 기준",
   "quote": "오늘도 냉철한 판단과 흔들림 없는 원칙으로 시장을 이기는 하루를 시작하세요!",
   "markets": [
     {
       "name": "미국 S&P 500",
-      "price": "7,496.02",
-      "change": "-1.27%"
+      "price": "7,466.95",
+      "change": "-1.65%"
     },
     {
       "name": "미국 나스닥",
-      "price": "24,785.83",
-      "change": "-2.29%"
+      "price": "24,641.21",
+      "change": "-2.86%"
     },
     {
       "name": "비트코인 (USD)",
-      "price": "65,225.48",
-      "change": "-0.12%"
+      "price": "64,170.12",
+      "change": "-1.74%"
     },
     {
       "name": "이더리움 (USD)",
-      "price": "1,849.37",
-      "change": "+0.76%"
+      "price": "1,807.66",
+      "change": "-1.52%"
     },
     {
       "name": "원/달러 환율",
-      "price": "1,336원",
-      "change": "+0.16%"
+      "price": "1,335원",
+      "change": "+0.11%"
     },
     {
       "name": "코스피 (KOSPI)",
@@ -34,8 +34,8 @@
     },
     {
       "name": "국제 금 시세",
-      "price": "3,883.50",
-      "change": "-0.07%"
+      "price": "3,880.60",
+      "change": "-0.15%"
     },
     {
       "name": "삼성전자",
@@ -49,59 +49,59 @@
     },
     {
       "name": "엔비디아",
-      "price": "160.33",
-      "change": "-3.53%"
+      "price": "159.93",
+      "change": "-3.77%"
     },
     {
       "name": "마이크로소프트",
-      "price": "522.15",
-      "change": "-0.16%"
+      "price": "518.65",
+      "change": "-0.83%"
     },
     {
       "name": "구글 (알파벳)",
-      "price": "289.20",
-      "change": "-3.18%"
+      "price": "287.04",
+      "change": "-3.90%"
     },
     {
       "name": "아마존",
-      "price": "262.29",
-      "change": "-1.93%"
+      "price": "259.41",
+      "change": "-3.00%"
     },
     {
       "name": "메타",
-      "price": "632.07",
-      "change": "+1.36%"
+      "price": "623.99",
+      "change": "+0.06%"
     },
     {
       "name": "테슬라",
-      "price": "380.12",
-      "change": "-4.36%"
+      "price": "377.76",
+      "change": "-4.95%"
     },
     {
       "name": "비자 (Visa)",
-      "price": "429.62",
-      "change": "+2.22%"
+      "price": "430.04",
+      "change": "+2.31%"
     },
     {
       "name": "조에티스 (ZTS)",
-      "price": "84.19",
-      "change": "+1.49%"
+      "price": "84.25",
+      "change": "+1.55%"
     },
     {
       "name": "디즈니 (DIS)",
-      "price": "119.07",
-      "change": "+0.71%"
+      "price": "119.13",
+      "change": "+0.76%"
     },
     {
       "name": "퍼거슨 (FERG)",
-      "price": "256.78",
-      "change": "+0.74%"
+      "price": "256.81",
+      "change": "+0.76%"
     },
     {
       "name": "트랜스오션 (RIG)",
-      "price": "5.45",
-      "change": "+2.35%"
+      "price": "5.41",
+      "change": "+1.69%"
     }
   ],
-  "summary": "뉴스 요약 생성에 실패했습니다."
+  "summary": "AI API 호출 오류 (404): {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.8-flash for the latest features and improvements. We recommend you to use the Interactions API (https://aistudio.google.com/docs/get-started).\",\n    \"status\": \"NOT_FOUND\"\n  }\n}\n"
 }
