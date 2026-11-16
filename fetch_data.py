@@ -78,9 +78,33 @@ api_key = os.environ.get("GEMINI_API_KEY", "").strip()
 quote = "오늘도 냉철한 판단과 흔들림 없는 원칙으로 시장을 이기는 하루를 시작하세요!"
 summary = ""
 
-def call_gemini_with_retry(prompt, key):
-    # 주력 모델이 바쁠(503) 경우 자동 재시도 후 예비 모델로 자동 전환
-    models = ["gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-3.8-pro"]
+def get_available_models(key):
+    """내 API 키로 실제 호출 가능한 모델 목록을 서버에서 직접 조회"""
+    valid_models = []
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
+        req = urllib.request.Request(url, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as res:
+            data = json.loads(res.read().decode())
+            for m in data.get("models", []):
+                name = m.get("name", "") # 예: models/gemini-3.8-flash
+                methods = m.get("supportedGenerationMethods", [])
+                if "generateContent" in methods and "gemini" in name:
+                    # 임베딩/이미지/오디오 전용 모델 제외
+                    if not any(x in name for x in ["embedding", "imagen", "veo", "aqa", "tts"]):
+                        valid_models.append(name.replace("models/", ""))
+    except Exception:
+        pass
+
+    # 최신 flash 모델을 최우선으로 정렬
+    valid_models.sort(key=lambda x: (
+        0 if "flash" in x and "lite" not in x else (1 if "flash" in x else 2),
+        x
+    ))
+    return valid_models if valid_models else ["gemini-3.8-flash"]
+
+def call_gemini_smart(prompt, key):
+    models = get_available_models(key)
     last_error = ""
     for model in models:
         for attempt in range(3):
@@ -88,21 +112,21 @@ def call_gemini_with_retry(prompt, key):
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
                 payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode("utf-8")
                 req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
-                with urllib.request.urlopen(req, timeout=40) as res:
+                with urllib.request.urlopen(req, timeout=45) as res:
                     result = json.loads(res.read().decode())
                     return result["candidates"][0]["content"]["parts"][0]["text"], None
             except urllib.error.HTTPError as e:
                 err_body = e.read().decode("utf-8", errors="ignore")
                 last_error = f"AI API 호출 오류 ({model} / {e.code}): {err_body}"
                 if e.code in (429, 500, 502, 503, 504):
-                    time.sleep(5)
+                    time.sleep(6)
                     continue
                 else:
                     break
             except Exception as e:
                 last_error = f"AI 요약 오류 ({model}): {str(e)}"
                 time.sleep(3)
-    return None, last_error
+    return None, f"시도한 모델 목록: {models}\n마지막 오류: {last_error}"
 
 if not api_key:
     summary = "오류: GitHub Secrets에 GEMINI_API_KEY가 등록되지 않았거나 비어 있습니다."
@@ -131,7 +155,7 @@ else:
         f"[수집된 암호화폐 헤드라인]\n{crypto_text}"
     )
 
-    full_text, err = call_gemini_with_retry(prompt, api_key)
+    full_text, err = call_gemini_smart(prompt, api_key)
     if full_text:
         if "===SPLIT===" in full_text:
             parts = full_text.split("===SPLIT===", 1)
